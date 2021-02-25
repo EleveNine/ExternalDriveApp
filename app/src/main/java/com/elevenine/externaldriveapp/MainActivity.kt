@@ -8,6 +8,7 @@ import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
@@ -21,6 +22,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // get usbDevice when intent-filter for opening this app when a usb drive is connected
+        // is called
         connectedDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
 
         if (packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST))
@@ -36,10 +39,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             var string = ""
-            deviceList.keys.forEach {
-                Log.d("MainActivity", it)
-                string += it + "\n"
+            deviceList.entries.forEach { entry ->
+                Log.d("MainActivity", entry.key)
+                string += entry.key + " - " + entry.value.deviceClass + "\n"
+
             }
+            findViewById<TextView>(R.id.tv_usb).text = string
 
             if (isUsbDriveConnected)
                 Toast.makeText(this, "UsbDrive is connected", Toast.LENGTH_SHORT).show()
