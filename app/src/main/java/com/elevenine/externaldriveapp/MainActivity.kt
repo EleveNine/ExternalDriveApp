@@ -10,14 +10,18 @@ import android.util.Log
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
     private var isUsbDriveConnected = false
+    private var connectedDevice: UsbDevice? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        connectedDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
 
         if (packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST))
             Log.d("MainActivity", "Usb host is ON")
@@ -36,9 +40,15 @@ class MainActivity : AppCompatActivity() {
                 Log.d("MainActivity", it)
                 string += it + "\n"
             }
-            
+
             if (isUsbDriveConnected)
                 Toast.makeText(this, "UsbDrive is connected", Toast.LENGTH_SHORT).show()
+
+            val pixel3_api30_filepath = "/storage/emulated/0/DCIM/asaka_cheque_1614257946330.png"
+            val file = File(pixel3_api30_filepath)
+            if (file.exists())
+                Log.d("MainActivity", "File exists")
+            else Log.d("MainActivity", "File is ABSENT")
         }
     }
 }
