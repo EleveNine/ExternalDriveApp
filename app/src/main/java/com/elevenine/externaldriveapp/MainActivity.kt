@@ -48,6 +48,16 @@ class MainActivity : AppCompatActivity() {
                         // access its file system
                         connectedDevice?.init()
 
+                        // you can check if the connected device is the one needed, getting its
+                        // name, class, subclass etc.
+                        connectedDevice?.usbDevice?.deviceClass
+                        connectedDevice?.usbDevice?.deviceSubclass
+                        connectedDevice?.usbDevice?.productId
+                        connectedDevice?.usbDevice?.productName
+                        connectedDevice?.usbDevice?.deviceName
+                        connectedDevice?.usbDevice?.deviceProtocol
+
+
                         // get the file system of the connected usb device. Only uses the first
                         // partition on the device.
                         val currentFs = connectedDevice?.partitions?.get(0)?.fileSystem
@@ -91,6 +101,11 @@ class MainActivity : AppCompatActivity() {
                                     usbFileOrDirectory,
                                     currentFs
                                 )
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "inputStream was successfully created",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } else { }
 
                         }
