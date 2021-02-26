@@ -17,44 +17,82 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.github.mjdev.libaums.UsbMassStorageDevice
-import java.io.File
+import com.github.mjdev.libaums.fs.UsbFile
+import com.github.mjdev.libaums.fs.UsbFileStreamFactory
+import java.io.BufferedInputStream
 
 
 class MainActivity : AppCompatActivity() {
 
-    private var isUsbDriveConnected = false
+    /**
+     * stores currently connected mass storage usb device, so that a [usbReceiver] can perform
+     * its action to his usb device.
+     */
     private var connectedDevice: UsbMassStorageDevice? = null
 
     private var manager: UsbManager? = null
     private var testInfoString = ""
 
-    private val ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION"
-
+    /**
+     * The broadcast receiver that receives the permission for operating with the usb device.
+     */
     private val usbReceiver = object : BroadcastReceiver() {
 
         override fun onReceive(context: Context, intent: Intent) {
             if (ACTION_USB_PERMISSION == intent.action) {
                 synchronized(this) {
 
+                    // If the permission was granted, then perform actions with the usb device
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
-                        // before interacting with a device you need to call init()!
+                        // before interacting with a device you need to init it so that we can
+                        // access its file system
                         connectedDevice?.init()
 
-                        // Only uses the first partition on the device
+                        // get the file system of the connected usb device. Only uses the first
+                        // partition on the device.
                         val currentFs = connectedDevice?.partitions?.get(0)?.fileSystem
+
+                        // some testing strings
                         testInfoString += currentFs?.rootDirectory?.absolutePath + "\n"
                         testInfoString += "Capacity: " + currentFs?.capacity + "\n"
-
                         Log.d(TAG, "Occupied Space: " + currentFs?.occupiedSpace)
                         Log.d(TAG, "Free Space: " + currentFs?.freeSpace)
                         Log.d(TAG, "Chunk size: " + currentFs?.chunkSize)
 
+
+                        // get the root directory of the file system of the currently connected
+                        // usb drive.
                         val root = currentFs?.rootDirectory
-                        val usbDirectory = root?.search(findViewById<EditText>(R.id.et_search).text.toString())
-                        if (usbDirectory == null) {
-                            Toast.makeText(this@MainActivity, "Directory was not found!", Toast.LENGTH_SHORT).show()
+
+                        // get the directory or file from the path which was entered by a user in
+                        // the editText field. If no directory or file was found, then it will have
+                        // null.
+                        val usbFileOrDirectory: UsbFile? =
+                            root?.search(findViewById<EditText>(R.id.et_search).text.toString())
+
+
+                        if (usbFileOrDirectory == null) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Directory was not found!",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         } else {
-                            Toast.makeText(this@MainActivity, usbDirectory.absolutePath + " - " + usbDirectory.name, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                usbFileOrDirectory.absolutePath + " - " + usbFileOrDirectory.name,
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            // if the path entered by a user indicates a file, then get its inputStream.
+                            val inputStream: BufferedInputStream
+                            if (!usbFileOrDirectory.isDirectory) {
+                                inputStream = UsbFileStreamFactory.createBufferedInputStream(
+                                    usbFileOrDirectory,
+                                    currentFs
+                                )
+                            } else { }
+
                         }
                     } else {
                         Log.d("MainActivity", "permission denied for device $connectedDevice")
@@ -68,22 +106,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // get usbDevice when intent-filter for opening this app when a usb drive is connected
-        // is called
-        connectedDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-
-
-
+        // when a button is pressed:
         findViewById<Button>(R.id.btn_usb).setOnClickListener {
-            /*checkIfUsbStorageIsConnected()
-            if (isUsbDriveConnected)
-                Toast.makeText(this, "UsbDrive is connected", Toast.LENGTH_SHORT).show()
-
-            isFileExists()*/
 
             if (packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)) {
-                val devices =
-                    UsbMassStorageDevice.getMassStorageDevices(this /* Context or Activity */)
+                val devices = UsbMassStorageDevice.getMassStorageDevices(this)
 
                 // just print data for testing
                 devices.forEach { entry ->
@@ -93,31 +120,40 @@ class MainActivity : AppCompatActivity() {
                 }
                 testInfoString += "device info: " + "\n"
 
+                // traverse through all connected devices or you can just take 1 device (i.e. 0th)
                 for (device in devices) {
 
                     connectedDevice = device
 
+                    // init the UsbManager to handle usb otg connect/disconnect
                     manager = getSystemService(USB_SERVICE) as UsbManager
+
+                    // register a broadcast receiver for getting permission and performing an action
+                    // right after the permission is granted
                     registerReceiver(usbReceiver, IntentFilter(ACTION_USB_PERMISSION))
+
+                    // build and request a usb permission
                     val permissionIntent =
                         PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), 0)
                     manager?.requestPermission(device.usbDevice, permissionIntent)
                 }
 
+                // just print the data on the screen for testing purposes
                 findViewById<TextView>(R.id.tv_usb).text = testInfoString
             }
         }
     }
 
-    private fun isFileExists() {
-        val pixel3_api30_filepath = "/storage/emulated/0/DCIM/asaka_cheque_1614257946330.png"
-        val file = File(pixel3_api30_filepath)
 
-        if (file.exists())
-            Log.d("MainActivity", "File exists")
-        else Log.d("MainActivity", "File is ABSENT")
-    }
-
+    /*
+    *
+    *
+    * a method to find if a usb is connected without an external library, not used
+    *
+    *
+    *
+    * */
+    private var isUsbDriveConnected = false
     private fun checkIfUsbStorageIsConnected() {
         if (packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)) {
             manager = getSystemService(USB_SERVICE) as UsbManager
@@ -149,23 +185,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-/*    private fun isAccessGranted(): Boolean {
-        return try {
-            val packageManager = packageManager
-            val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
-            val appOpsManager = getSystemService(APP_OPS_SERVICE) as AppOpsManager
-            var mode = appOpsManager.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                applicationInfo.uid, applicationInfo.packageName
-            )
-            mode == AppOpsManager.MODE_ALLOWED
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        }
-    }*/
-
-
     companion object {
         const val TAG = "MainActivity"
+        const val ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION"
     }
 }
